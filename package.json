@@ -1,0 +1,40 @@
+{
+  "name": "ai-token-counter",
+  "version": "1.0.0",
+  "description": "A tiny Node.js library for rough token estimation for OpenAI and Claude models.",
+  "main": "index.js",
+  "type": "commonjs",
+  "exports": {
+    ".": "./index.js"
+  },
+  "files": [
+    "index.js",
+    "example.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test test.js"
+  },
+  "keywords": [
+    "ai",
+    "tokens",
+    "token-counter",
+    "openai",
+    "claude",
+    "anthropic"
+  ],
+  "author": "Quionie G.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/quionie/ai-token-counter.git"
+  },
+  "bugs": {
+    "url": "https://github.com/quionie/ai-token-counter/issues"
+  },
+  "homepage": "https://github.com/quionie/ai-token-counter#readme"
+}
