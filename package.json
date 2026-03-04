@@ -3,6 +3,7 @@
   "version": "1.0.4",
   "description": "A tiny Node.js library for rough token estimation for OpenAI and Claude models.",
   "main": "index.js",
+  "types": "index.d.ts",
   "bin": {
     "ai-token-counter": "cli.js"
   },
@@ -12,6 +13,7 @@
   },
   "files": [
     "cli.js",
+    "index.d.ts",
     "index.js",
     "example.js",
     "README.md",

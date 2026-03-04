@@ -1,6 +1,11 @@
 "use strict";
 
-const { countTokens, countMessages } = require("./index");
+const {
+  countTokens,
+  countMessages,
+  getModelInfo,
+  fitsContextWindow
+} = require("./index");
 
 const sample = [
   "You are reviewing a support escalation.",
@@ -10,8 +15,10 @@ const sample = [
 
 console.log("OpenAI (gpt-4o):", countTokens(sample, "gpt-4o"));
 console.log("OpenAI (o3-mini):", countTokens(sample, "o3-mini"));
+console.log("Gemini (gemini-2.0-flash):", countTokens(sample, "gemini-2.0-flash"));
 console.log("Claude (claude-3-5-sonnet):", countTokens(sample, "claude-3-5-sonnet"));
 console.log("Claude (sonnet-4):", countTokens(sample, "sonnet-4"));
+console.log("Claude (opus 4.6):", countTokens(sample, "opus 4.6"));
 
 const messages = [
   {
@@ -25,3 +32,9 @@ const messages = [
 ];
 
 console.log("Chat messages (gpt-4o):", countMessages(messages, "gpt-4o"));
+console.log("Chat messages (gemini-1.5-pro):", countMessages(messages, "gemini-1.5-pro"));
+console.log("Model info (sonnet-4):", getModelInfo("sonnet-4"));
+console.log(
+  "Fits context window (gpt-4o):",
+  fitsContextWindow(sample, "gpt-4o", 2000)
+);

@@ -7,39 +7,72 @@ const NUMBER_PATTERN = /\d+(?:[.,:/-]\d+)*/g;
 const PUNCTUATION_PATTERN = /[!-/:-@[-`{-~]/g;
 const EMOJI_PATTERN =
   /[\u{1f300}-\u{1f5ff}\u{1f600}-\u{1f64f}\u{1f680}-\u{1f6ff}\u{1f900}-\u{1f9ff}\u{1fa70}-\u{1faff}]/gu;
+const MODEL_PROFILES = {
+  openai: {
+    family: "openai",
+    contextWindow: 128000,
+    supportsMessages: true,
+    matchers: ["gpt", "o1", "o3", "o4", "text-embedding", "openai"]
+  },
+  gemini: {
+    family: "gemini",
+    contextWindow: 1000000,
+    supportsMessages: true,
+    matchers: ["gemini", "google"]
+  },
+  claude: {
+    family: "claude",
+    contextWindow: 200000,
+    supportsMessages: true,
+    matchers: ["claude", "anthropic", "haiku", "sonnet", "opus"]
+  }
+};
 
-function detectProvider(model) {
+function normalizeModel(model) {
   if (typeof model !== "string" || model.trim() === "") {
     throw new TypeError("model must be a non-empty string");
   }
 
-  const normalizedModel = model.toLowerCase();
-  const compactModel = normalizedModel.replace(/[\s_/.:]+/g, "-");
+  return model.toLowerCase().replace(/[\s_/.:]+/g, "-");
+}
 
-  if (
-    compactModel.includes("gpt") ||
-    compactModel.includes("o1") ||
-    compactModel.includes("o3") ||
-    compactModel.includes("o4") ||
-    compactModel.includes("text-embedding") ||
-    compactModel.includes("openai")
-  ) {
-    return "openai";
-  }
+function resolveModelProfile(model) {
+  const normalizedModel = normalizeModel(model);
 
-  if (
-    compactModel.includes("claude") ||
-    compactModel.includes("anthropic") ||
-    compactModel.includes("haiku") ||
-    compactModel.includes("sonnet") ||
-    compactModel.includes("opus")
-  ) {
-    return "claude";
+  for (const [provider, profile] of Object.entries(MODEL_PROFILES)) {
+    for (const matcher of profile.matchers) {
+      if (normalizedModel.includes(matcher)) {
+        return {
+          provider,
+          profile,
+          normalizedModel,
+          matchedBy: matcher
+        };
+      }
+    }
   }
 
   throw new RangeError(
-    "Unsupported model. Use an OpenAI or Claude model name."
+    "Unsupported model. Use an OpenAI, Gemini, or Claude model name."
   );
+}
+
+function detectProvider(model) {
+  return resolveModelProfile(model).provider;
+}
+
+function getModelInfo(model) {
+  const { provider, profile, normalizedModel, matchedBy } =
+    resolveModelProfile(model);
+
+  return {
+    provider,
+    family: profile.family,
+    normalizedModel,
+    contextWindow: profile.contextWindow,
+    supportsMessages: profile.supportsMessages,
+    matchedBy
+  };
 }
 
 function countMatches(text, pattern) {
@@ -134,7 +167,23 @@ function countTokens(text, model) {
     residualChars * 0.22 +
     0.35;
 
-  const estimate = provider === "openai" ? openAiEstimate : claudeEstimate;
+  const geminiEstimate =
+    wordTokens * 0.98 +
+    cjkCount * 1.48 +
+    numberGroups * 0.88 +
+    punctuationCount * 0.3 +
+    whitespaceGroups * 0.11 +
+    emojiCount * 2.1 +
+    residualChars * 0.23 +
+    0.4;
+
+  let estimate = claudeEstimate;
+
+  if (provider === "openai") {
+    estimate = openAiEstimate;
+  } else if (provider === "gemini") {
+    estimate = geminiEstimate;
+  }
 
   return Math.max(1, Math.ceil(estimate));
 }
@@ -181,7 +230,46 @@ function countMessages(messages, model) {
   return total;
 }
 
+function fitsContextWindow(input, model, maxOutputTokens) {
+  const modelInfo = getModelInfo(model);
+  const reservedOutputTokens =
+    maxOutputTokens === undefined ? 0 : maxOutputTokens;
+
+  if (!Number.isInteger(reservedOutputTokens) || reservedOutputTokens < 0) {
+    throw new TypeError(
+      "maxOutputTokens must be a non-negative integer when provided"
+    );
+  }
+
+  let inputTokens;
+
+  if (typeof input === "string") {
+    inputTokens = countTokens(input, model);
+  } else if (Array.isArray(input)) {
+    inputTokens = countMessages(input, model);
+  } else {
+    throw new TypeError("input must be a string or an array of messages");
+  }
+
+  const availableInputTokens = Math.max(
+    0,
+    modelInfo.contextWindow - reservedOutputTokens
+  );
+
+  return {
+    fits: inputTokens <= availableInputTokens,
+    inputTokens,
+    reservedOutputTokens,
+    availableInputTokens,
+    contextWindow: modelInfo.contextWindow,
+    model: modelInfo.normalizedModel,
+    provider: modelInfo.provider
+  };
+}
+
 module.exports = {
   countTokens,
-  countMessages
+  countMessages,
+  getModelInfo,
+  fitsContextWindow
 };

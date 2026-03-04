@@ -5,7 +5,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/ai-token-counter)](https://www.npmjs.com/package/ai-token-counter)
 [![CI](https://img.shields.io/github/actions/workflow/status/quionie/ai-token-counter/ci.yml?branch=main&label=ci)](https://github.com/quionie/ai-token-counter/actions/workflows/ci.yml)
 
-A small, dependency-free Node.js utility for rough token estimation across OpenAI and Claude model families.
+A small, dependency-free Node.js utility for rough token estimation across OpenAI, Gemini, and Claude model families.
 
 `ai-token-counter` helps developers estimate prompt size before making API calls. It is built for simple scripts, backend services, and internal tooling where you need a fast approximation without pulling in a full tokenizer.
 
@@ -18,7 +18,8 @@ The estimator now uses a chunk-based heuristic that weighs words, numbers, punct
 - Dependency-free Node.js package
 - Simple API for both plain text and chat-style messages
 - Small CLI for fast prompt checks in scripts and terminals
-- Supports common OpenAI and Claude naming patterns
+- TypeScript typings included
+- Supports common OpenAI, Gemini, and Claude naming patterns
 - Built for lightweight prompt budgeting and preflight validation
 
 ## Quick Start
@@ -35,6 +36,7 @@ Estimate text:
 const { countTokens } = require("ai-token-counter");
 
 console.log(countTokens("Summarize this support issue.", "gpt-4o"));
+console.log(countTokens("Summarize this support issue.", "gemini-2.0-flash"));
 ```
 
 Estimate chat messages:
@@ -48,6 +50,28 @@ const messages = [
 ];
 
 console.log(countMessages(messages, "sonnet-4"));
+console.log(countMessages(messages, "gemini-1.5-pro"));
+```
+
+TypeScript works out of the box:
+
+```ts
+import { countMessages, countTokens } from "ai-token-counter";
+
+const textCount = countTokens("Summarize this support issue.", "gpt-4o");
+const messageCount = countMessages(
+  [{ role: "user", content: "Review this changelog." }],
+  "sonnet-4"
+);
+```
+
+Check model metadata and prompt fit:
+
+```js
+const { getModelInfo, fitsContextWindow } = require("ai-token-counter");
+
+console.log(getModelInfo("sonnet-4"));
+console.log(fitsContextWindow("Summarize this issue.", "gpt-4o", 2000));
 ```
 
 ## What problem it solves
@@ -63,6 +87,7 @@ When building with LLM APIs, it is common to need a quick estimate of prompt siz
 `ai-token-counter` gives you a simple way to do that with a single function call.
 
 It now supports both raw text estimation and chat-style message arrays.
+It also includes model metadata and context-window checks for prompt budget guardrails.
 
 ## Installation
 
@@ -94,12 +119,16 @@ const prompt = [
 ].join(" ");
 
 const openAiEstimate = countTokens(prompt, "gpt-4o");
+const geminiEstimate = countTokens(prompt, "gemini-2.0-flash");
 const claudeEstimate = countTokens(prompt, "claude-3-5-sonnet");
 const claudeAliasEstimate = countTokens(prompt, "sonnet-4");
+const claudeOpusAliasEstimate = countTokens(prompt, "opus 4.6");
 
 console.log("OpenAI estimate:", openAiEstimate);
+console.log("Gemini estimate:", geminiEstimate);
 console.log("Claude estimate:", claudeEstimate);
 console.log("Claude alias estimate:", claudeAliasEstimate);
+console.log("Claude Opus alias estimate:", claudeOpusAliasEstimate);
 ```
 
 Chat-style payloads are also supported:
@@ -138,6 +167,8 @@ The library exports:
 
 - `countTokens(text, model)`
 - `countMessages(messages, model)`
+- `getModelInfo(model)`
+- `fitsContextWindow(input, model, maxOutputTokens?)`
 
 ## CLI
 
@@ -152,7 +183,7 @@ npx ai-token-counter "Summarize this pull request and call out the main risk." -
 Count text from a file:
 
 ```bash
-npx ai-token-counter --model sonnet-4 --file ./prompt.txt
+npx ai-token-counter --model gemini-1.5-pro --file ./prompt.txt
 ```
 
 Show help:
@@ -168,7 +199,7 @@ npx ai-token-counter --help
 Returns a rough integer token estimate for the supplied `text` and `model`.
 
 - `text`: string input to estimate
-- `model`: model name string, such as `gpt-4o`, `gpt-4.1-mini`, `o3-mini`, `claude-3-opus`, `claude-3-5-sonnet`, or `sonnet-4`
+- `model`: model name string, such as `gpt-4o`, `gpt-4.1-mini`, `gemini-2.0-flash`, `claude-3-opus`, `claude-3-5-sonnet`, `sonnet-4`, or `opus 4.6`
 
 Returns a rounded integer estimate. The function throws for unsupported model names or invalid input types.
 
@@ -177,9 +208,35 @@ Returns a rounded integer estimate. The function throws for unsupported model na
 Returns a rough token estimate for a chat-style message array.
 
 - `messages`: an array of objects with `role` and string `content`
-- `model`: model name string, such as `gpt-4o`, `o3-mini`, `claude-3-5-sonnet`, or `sonnet-4`
+- `model`: model name string, such as `gpt-4o`, `gemini-1.5-pro`, `o3-mini`, `claude-3-5-sonnet`, `sonnet-4`, or `opus 4.6`
 
 The function sums the estimated content tokens and adds a small overhead for message structure.
+
+### `getModelInfo(model)`
+
+Returns normalized metadata for a supported model family.
+
+- `provider`: recognized provider family
+- `normalizedModel`: normalized model string used internally
+- `contextWindow`: default context window estimate for the provider family
+- `supportsMessages`: whether message arrays are supported
+
+### `fitsContextWindow(input, model, maxOutputTokens?)`
+
+Checks whether a prompt likely fits within the model's estimated context window.
+
+- `input`: either a raw text string or a chat-style message array
+- `model`: model name string
+- `maxOutputTokens`: optional output-token budget to reserve
+
+Returns an object with:
+
+- `fits`
+- `inputTokens`
+- `reservedOutputTokens`
+- `availableInputTokens`
+- `contextWindow`
+- `provider`
 
 ## Supported Models
 
@@ -204,6 +261,24 @@ Examples:
 - `o3-mini`
 - `text-embedding-3-small`
 
+Default family context window used by this package: `128000`
+
+### Gemini
+
+Matches model names containing:
+
+- `gemini`
+- `google`
+
+Examples:
+
+- `gemini-1.5-pro`
+- `gemini-1.5-flash`
+- `gemini-2.0-flash`
+- `google/gemini-2.0-flash-thinking`
+
+Default family context window used by this package: `1000000`
+
 ### Claude
 
 Matches model names containing:
@@ -220,6 +295,9 @@ Examples:
 - `sonnet-4`
 - `haiku-3.5`
 - `opus-4`
+- `opus 4.6`
+
+Default family context window used by this package: `200000`
 
 If a model name does not match one of these families, `countTokens` throws a `RangeError`.
 

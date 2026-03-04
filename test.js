@@ -5,7 +5,12 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
-const { countTokens, countMessages } = require("./index");
+const {
+  countTokens,
+  countMessages,
+  getModelInfo,
+  fitsContextWindow
+} = require("./index");
 
 test("returns 0 for empty text", () => {
   assert.equal(countTokens("", "gpt-4o"), 0);
@@ -25,6 +30,13 @@ test("estimates tokens for Claude models", () => {
   assert.ok(result >= 1);
 });
 
+test("estimates tokens for Gemini models", () => {
+  const result = countTokens("Hello world from Gemini", "gemini-2.0-flash");
+
+  assert.equal(typeof result, "number");
+  assert.ok(result >= 1);
+});
+
 test("supports Claude family names without the claude prefix", () => {
   const result = countTokens(
     "Plan a release note summary with highlights and follow-up tasks.",
@@ -33,6 +45,27 @@ test("supports Claude family names without the claude prefix", () => {
 
   assert.equal(typeof result, "number");
   assert.ok(result >= 1);
+});
+
+test("supports Claude opus aliases with spaces", () => {
+  const result = countTokens(
+    "Review this incident summary and provide executive highlights.",
+    "opus 4.6"
+  );
+
+  assert.equal(typeof result, "number");
+  assert.ok(result >= 1);
+});
+
+test("returns model metadata for supported models", () => {
+  assert.deepEqual(getModelInfo("opus 4.6"), {
+    provider: "claude",
+    family: "claude",
+    normalizedModel: "opus-4-6",
+    contextWindow: 200000,
+    supportsMessages: true,
+    matchedBy: "opus"
+  });
 });
 
 test("produces different estimates for different providers", () => {
@@ -54,6 +87,10 @@ test("throws for unsupported model names", () => {
 
 test("throws for invalid text input", () => {
   assert.throws(() => countTokens(null, "gpt-4o"), /text must be a string/);
+});
+
+test("throws for unsupported model info lookups", () => {
+  assert.throws(() => getModelInfo("mistral-small"), /Unsupported model/);
 });
 
 test("counts dense mixed content higher than plain prose", () => {
@@ -98,6 +135,50 @@ test("supports Claude models when counting messages", () => {
   assert.ok(countMessages(messages, "sonnet-4") >= 1);
 });
 
+test("supports Gemini models when counting messages", () => {
+  const messages = [
+    {
+      role: "user",
+      content: "Summarize this product feedback into a concise update."
+    }
+  ];
+
+  assert.ok(countMessages(messages, "gemini-1.5-pro") >= 1);
+});
+
+test("fitsContextWindow returns prompt budget details for text", () => {
+  const result = fitsContextWindow(
+    "Summarize this support thread.",
+    "gpt-4o",
+    500
+  );
+
+  assert.equal(result.provider, "openai");
+  assert.equal(result.contextWindow, 128000);
+  assert.equal(result.reservedOutputTokens, 500);
+  assert.ok(result.inputTokens >= 1);
+  assert.equal(result.fits, true);
+});
+
+test("fitsContextWindow supports chat-style messages", () => {
+  const result = fitsContextWindow(
+    [{ role: "user", content: "Summarize this outage report." }],
+    "gemini-1.5-pro",
+    1000
+  );
+
+  assert.equal(result.provider, "gemini");
+  assert.equal(result.contextWindow, 1000000);
+  assert.equal(result.fits, true);
+});
+
+test("fitsContextWindow returns false when reserved output exceeds capacity", () => {
+  const result = fitsContextWindow("hello", "sonnet-4", 500000);
+
+  assert.equal(result.availableInputTokens, 0);
+  assert.equal(result.fits, false);
+});
+
 test("returns 0 for an empty messages array", () => {
   assert.equal(countMessages([], "gpt-4o"), 0);
 });
@@ -107,6 +188,17 @@ test("throws for invalid message collections", () => {
   assert.throws(
     () => countMessages([{ role: "user", content: 42 }], "gpt-4o"),
     /each message content must be a string/
+  );
+});
+
+test("fitsContextWindow validates its inputs", () => {
+  assert.throws(
+    () => fitsContextWindow({ text: "hello" }, "gpt-4o"),
+    /input must be a string or an array of messages/
+  );
+  assert.throws(
+    () => fitsContextWindow("hello", "gpt-4o", -1),
+    /maxOutputTokens must be a non-negative integer/
   );
 });
 
