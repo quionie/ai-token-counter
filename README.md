@@ -3,6 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/ai-token-counter)](https://www.npmjs.com/package/ai-token-counter)
 [![license](https://img.shields.io/npm/l/ai-token-counter)](./LICENSE)
 [![npm downloads](https://img.shields.io/npm/dm/ai-token-counter)](https://www.npmjs.com/package/ai-token-counter)
+[![CI](https://img.shields.io/github/actions/workflow/status/quionie/ai-token-counter/ci.yml?branch=main&label=ci)](https://github.com/quionie/ai-token-counter/actions/workflows/ci.yml)
 
 A small, dependency-free Node.js utility for rough token estimation across OpenAI and Claude model families.
 
@@ -11,6 +12,43 @@ A small, dependency-free Node.js utility for rough token estimation across OpenA
 It is intentionally lightweight and fast. The tradeoff is that estimates are approximate, not exact. Real provider token counts may differ.
 
 The estimator now uses a chunk-based heuristic that weighs words, numbers, punctuation, CJK characters, and emoji separately, which produces more realistic results than a plain character count.
+
+## Highlights
+
+- Dependency-free Node.js package
+- Simple API for both plain text and chat-style messages
+- Small CLI for fast prompt checks in scripts and terminals
+- Supports common OpenAI and Claude naming patterns
+- Built for lightweight prompt budgeting and preflight validation
+
+## Quick Start
+
+Install:
+
+```bash
+npm install ai-token-counter
+```
+
+Estimate text:
+
+```js
+const { countTokens } = require("ai-token-counter");
+
+console.log(countTokens("Summarize this support issue.", "gpt-4o"));
+```
+
+Estimate chat messages:
+
+```js
+const { countMessages } = require("ai-token-counter");
+
+const messages = [
+  { role: "system", content: "You are a concise assistant." },
+  { role: "user", content: "Summarize this outage report." }
+];
+
+console.log(countMessages(messages, "sonnet-4"));
+```
 
 ## What problem it solves
 
@@ -209,6 +247,15 @@ Run the built-in test suite:
 npm test
 ```
 
+## Repository
+
+This repository includes:
+
+- [README.md](./README.md) for package documentation
+- [CONTRIBUTING.md](./CONTRIBUTING.md) for contribution guidelines
+- [CHANGELOG.md](./CHANGELOG.md) for release notes
+- [LICENSE](./LICENSE) for licensing terms
+
 ## Contributing
 
 Contributions are welcome, especially if they improve the estimation heuristics while keeping the library simple and dependency-free.
@@ -233,8 +280,9 @@ Good contribution ideas:
 The package includes the required metadata to publish on npm. Before publishing:
 
 1. Update the version in `package.json`.
-2. Ensure you are logged in with `npm login`.
-3. Run `npm publish --access public`.
+2. Run `npm test`.
+3. Ensure you are logged in with `npm login`.
+4. Run `npm publish --access public`.
 
 ## License
 

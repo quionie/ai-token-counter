@@ -1,10 +1,10 @@
 {
   "name": "ai-token-counter",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "description": "A tiny Node.js library for rough token estimation for OpenAI and Claude models.",
   "main": "index.js",
   "bin": {
-    "ai-token-counter": "./cli.js"
+    "ai-token-counter": "cli.js"
   },
   "type": "commonjs",
   "exports": {
@@ -40,8 +40,5 @@
   "bugs": {
     "url": "https://github.com/quionie/ai-token-counter/issues"
   },
-  "homepage": "https://github.com/quionie/ai-token-counter#readme",
-  "dependencies": {
-    "ai-token-counter": "^1.0.0"
-  }
+  "homepage": "https://github.com/quionie/ai-token-counter#readme"
 }
