@@ -254,6 +254,8 @@ This repository includes:
 - [README.md](./README.md) for package documentation
 - [CONTRIBUTING.md](./CONTRIBUTING.md) for contribution guidelines
 - [CHANGELOG.md](./CHANGELOG.md) for release notes
+- [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) for community expectations
+- [SECURITY.md](./SECURITY.md) for security reporting guidance
 - [LICENSE](./LICENSE) for licensing terms
 
 ## Contributing
