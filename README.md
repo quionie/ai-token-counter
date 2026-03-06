@@ -187,6 +187,12 @@ Count text from a file:
 npx ai-token-counter --model gemini-1.5-pro --file ./prompt.txt
 ```
 
+Count chat-style messages from a JSON file:
+
+```bash
+npx ai-token-counter --model sonnet-4 --messages-file ./messages.json
+```
+
 Show help:
 
 ```bash
@@ -207,6 +213,15 @@ npx ai-token-counter --json --model gpt-4o "Summarize this issue"
 
 ```bash
 npx ai-token-counter --json --cost --model gpt-4o --output-tokens 500 "Summarize this issue"
+```
+
+`--messages-file` expects a JSON array:
+
+```json
+[
+  { "role": "system", "content": "You are a concise assistant." },
+  { "role": "user", "content": "Summarize this release note." }
+]
 ```
 
 ## API

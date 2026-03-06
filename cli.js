@@ -3,16 +3,17 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { countTokens, estimateCost, getModelInfo } = require("./index");
+const { countTokens, countMessages, estimateCost, getModelInfo } = require("./index");
 
 function printUsage() {
   console.log(
-    "Usage: ai-token-counter [text] --model <model> [--file <path>] [--cost] [--output-tokens <n>] [--json]"
+    "Usage: ai-token-counter [text] --model <model> [--file <path> | --messages-file <path>] [--cost] [--output-tokens <n>] [--json]"
   );
   console.log("");
   console.log("Examples:");
   console.log('  ai-token-counter "Summarize this PR" --model gpt-4o');
   console.log("  ai-token-counter --model sonnet-4 --file ./prompt.txt");
+  console.log("  ai-token-counter --model sonnet-4 --messages-file ./messages.json");
   console.log(
     '  ai-token-counter --cost --model gpt-4o "Explain Kubernetes in 2 sentences"'
   );
@@ -24,6 +25,7 @@ function parseArgs(argv) {
     textParts: [],
     model: null,
     file: null,
+    messagesFile: null,
     help: false,
     cost: false,
     outputTokens: 0,
@@ -60,6 +62,12 @@ function parseArgs(argv) {
       continue;
     }
 
+    if (arg === "--messages-file" || arg === "--messagesFile") {
+      index += 1;
+      args.messagesFile = argv[index] || null;
+      continue;
+    }
+
     if (arg === "--output-tokens" || arg === "--outputTokens") {
       index += 1;
       const value = Number(argv[index]);
@@ -78,13 +86,44 @@ function parseArgs(argv) {
   return args;
 }
 
-function loadInputText(parsedArgs) {
-  if (parsedArgs.file) {
-    const filePath = path.resolve(process.cwd(), parsedArgs.file);
-    return fs.readFileSync(filePath, "utf8");
+function loadInput(parsedArgs) {
+  if (parsedArgs.file && parsedArgs.messagesFile) {
+    throw new Error("Use either --file or --messages-file, not both.");
   }
 
-  return parsedArgs.textParts.join(" ");
+  if (parsedArgs.messagesFile) {
+    const filePath = path.resolve(process.cwd(), parsedArgs.messagesFile);
+    const raw = fs.readFileSync(filePath, "utf8");
+    let parsed;
+
+    try {
+      parsed = JSON.parse(raw);
+    } catch (error) {
+      throw new Error("messages file must contain valid JSON.");
+    }
+
+    if (!Array.isArray(parsed)) {
+      throw new Error("messages file must be a JSON array of message objects.");
+    }
+
+    return {
+      kind: "messages",
+      value: parsed
+    };
+  }
+
+  if (parsedArgs.file) {
+    const filePath = path.resolve(process.cwd(), parsedArgs.file);
+    return {
+      kind: "text",
+      value: fs.readFileSync(filePath, "utf8")
+    };
+  }
+
+  return {
+    kind: "text",
+    value: parsedArgs.textParts.join(" ")
+  };
 }
 
 function main() {
@@ -100,14 +139,19 @@ function main() {
       throw new Error("Missing required --model argument.");
     }
 
-    const text = loadInputText(parsedArgs);
+    const input = loadInput(parsedArgs);
 
-    if (!text) {
-      throw new Error("Provide text directly or use --file <path>.");
+    if (
+      (input.kind === "text" && !input.value) ||
+      (input.kind === "messages" && input.value.length === 0)
+    ) {
+      throw new Error(
+        "Provide text directly, use --file <path>, or use --messages-file <path>."
+      );
     }
 
     if (parsedArgs.cost) {
-      const estimate = estimateCost(text, parsedArgs.model, {
+      const estimate = estimateCost(input.value, parsedArgs.model, {
         outputTokens: parsedArgs.outputTokens
       });
       const info = getModelInfo(parsedArgs.model);
@@ -125,6 +169,7 @@ function main() {
           JSON.stringify(
             {
               mode: "cost",
+              inputType: input.kind,
               provider: info.provider,
               model: estimate.model,
               inputTokens: estimate.inputTokens,
@@ -147,7 +192,10 @@ function main() {
       process.exit(0);
     }
 
-    const tokens = countTokens(text, parsedArgs.model);
+    const tokens =
+      input.kind === "messages"
+        ? countMessages(input.value, parsedArgs.model)
+        : countTokens(input.value, parsedArgs.model);
 
     if (parsedArgs.json) {
       const info = getModelInfo(parsedArgs.model);
@@ -155,6 +203,7 @@ function main() {
         JSON.stringify(
           {
             mode: "tokens",
+            inputType: input.kind,
             provider: info.provider,
             model: info.normalizedModel,
             tokens

@@ -346,3 +346,136 @@ test("cli json mode returns machine-readable cost output", () => {
   assert.equal(result.outputTokensReserved, 100);
   assert.equal(typeof result.estimatedTotalCost, "number");
 });
+
+test("cli counts tokens from --messages-file", () => {
+  const fixturePath = path.join(__dirname, "tmp-cli-messages.json");
+
+  try {
+    fs.writeFileSync(
+      fixturePath,
+      JSON.stringify(
+        [
+          {
+            role: "system",
+            content: "You are a concise assistant."
+          },
+          {
+            role: "user",
+            content: "Summarize this release note."
+          }
+        ],
+        null,
+        2
+      ),
+      "utf8"
+    );
+
+    const output = execFileSync(
+      process.execPath,
+      ["./cli.js", "--model", "sonnet-4", "--messages-file", fixturePath],
+      {
+        cwd: __dirname,
+        encoding: "utf8"
+      }
+    ).trim();
+
+    assert.match(output, /^\d+$/);
+  } finally {
+    if (fs.existsSync(fixturePath)) {
+      fs.unlinkSync(fixturePath);
+    }
+  }
+});
+
+test("cli cost mode supports --messages-file", () => {
+  const fixturePath = path.join(__dirname, "tmp-cli-messages-cost.json");
+
+  try {
+    fs.writeFileSync(
+      fixturePath,
+      JSON.stringify(
+        [
+          {
+            role: "user",
+            content: "Summarize this incident and list three next steps."
+          }
+        ],
+        null,
+        2
+      ),
+      "utf8"
+    );
+
+    const output = execFileSync(
+      process.execPath,
+      [
+        "./cli.js",
+        "--cost",
+        "--model",
+        "gpt-4o",
+        "--messages-file",
+        fixturePath
+      ],
+      {
+        cwd: __dirname,
+        encoding: "utf8"
+      }
+    ).trim();
+
+    assert.match(output, /Tokens:\s+\d+/);
+    assert.match(output, /Estimated cost:\s+\$/);
+    assert.match(output, /Provider:\s+OpenAI/);
+  } finally {
+    if (fs.existsSync(fixturePath)) {
+      fs.unlinkSync(fixturePath);
+    }
+  }
+});
+
+test("cli json mode supports --messages-file", () => {
+  const fixturePath = path.join(__dirname, "tmp-cli-messages-json.json");
+
+  try {
+    fs.writeFileSync(
+      fixturePath,
+      JSON.stringify(
+        [
+          {
+            role: "user",
+            content: "Review this outage summary."
+          }
+        ],
+        null,
+        2
+      ),
+      "utf8"
+    );
+
+    const output = execFileSync(
+      process.execPath,
+      [
+        "./cli.js",
+        "--json",
+        "--cost",
+        "--model",
+        "gemini-1.5-pro",
+        "--messages-file",
+        fixturePath
+      ],
+      {
+        cwd: __dirname,
+        encoding: "utf8"
+      }
+    ).trim();
+    const result = JSON.parse(output);
+
+    assert.equal(result.mode, "cost");
+    assert.equal(result.inputType, "messages");
+    assert.equal(result.provider, "gemini");
+    assert.equal(typeof result.inputTokens, "number");
+  } finally {
+    if (fs.existsSync(fixturePath)) {
+      fs.unlinkSync(fixturePath);
+    }
+  }
+});
