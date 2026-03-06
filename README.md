@@ -199,6 +199,16 @@ Estimate cost directly from the CLI:
 npx ai-token-counter --cost --model gpt-4o "Explain Kubernetes in 2 sentences"
 ```
 
+Get machine-readable JSON output for scripts/CI:
+
+```bash
+npx ai-token-counter --json --model gpt-4o "Summarize this issue"
+```
+
+```bash
+npx ai-token-counter --json --cost --model gpt-4o --output-tokens 500 "Summarize this issue"
+```
+
 ## API
 
 ### `countTokens(text, model)`

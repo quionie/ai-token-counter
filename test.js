@@ -302,3 +302,47 @@ test("cli cost mode prints formatted cost output", () => {
   assert.match(output, /Estimated cost:\s+\$/);
   assert.match(output, /Provider:\s+OpenAI/);
 });
+
+test("cli json mode returns machine-readable token output", () => {
+  const output = execFileSync(
+    process.execPath,
+    ["./cli.js", "--json", "--model", "gpt-4o", "Summarize this pull request."],
+    {
+      cwd: __dirname,
+      encoding: "utf8"
+    }
+  ).trim();
+  const result = JSON.parse(output);
+
+  assert.equal(result.mode, "tokens");
+  assert.equal(result.provider, "openai");
+  assert.equal(result.model, "gpt-4o");
+  assert.equal(typeof result.tokens, "number");
+});
+
+test("cli json mode returns machine-readable cost output", () => {
+  const output = execFileSync(
+    process.execPath,
+    [
+      "./cli.js",
+      "--json",
+      "--cost",
+      "--model",
+      "gpt-4o",
+      "--output-tokens",
+      "100",
+      "Explain Kubernetes in 2 sentences."
+    ],
+    {
+      cwd: __dirname,
+      encoding: "utf8"
+    }
+  ).trim();
+  const result = JSON.parse(output);
+
+  assert.equal(result.mode, "cost");
+  assert.equal(result.provider, "openai");
+  assert.equal(result.model, "gpt-4o");
+  assert.equal(result.outputTokensReserved, 100);
+  assert.equal(typeof result.estimatedTotalCost, "number");
+});

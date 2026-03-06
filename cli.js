@@ -7,7 +7,7 @@ const { countTokens, estimateCost, getModelInfo } = require("./index");
 
 function printUsage() {
   console.log(
-    "Usage: ai-token-counter [text] --model <model> [--file <path>] [--cost] [--output-tokens <n>]"
+    "Usage: ai-token-counter [text] --model <model> [--file <path>] [--cost] [--output-tokens <n>] [--json]"
   );
   console.log("");
   console.log("Examples:");
@@ -16,6 +16,7 @@ function printUsage() {
   console.log(
     '  ai-token-counter --cost --model gpt-4o "Explain Kubernetes in 2 sentences"'
   );
+  console.log('  ai-token-counter --json --model gpt-4o "Summarize this issue"');
 }
 
 function parseArgs(argv) {
@@ -25,7 +26,8 @@ function parseArgs(argv) {
     file: null,
     help: false,
     cost: false,
-    outputTokens: 0
+    outputTokens: 0,
+    json: false
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -38,6 +40,11 @@ function parseArgs(argv) {
 
     if (arg === "--cost") {
       args.cost = true;
+      continue;
+    }
+
+    if (arg === "--json") {
+      args.json = true;
       continue;
     }
 
@@ -113,6 +120,27 @@ function main() {
         providerLabels[info.provider] ||
         info.provider.charAt(0).toUpperCase() + info.provider.slice(1);
 
+      if (parsedArgs.json) {
+        console.log(
+          JSON.stringify(
+            {
+              mode: "cost",
+              provider: info.provider,
+              model: estimate.model,
+              inputTokens: estimate.inputTokens,
+              outputTokensReserved: estimate.outputTokensReserved,
+              totalTokensEstimated: estimate.totalTokensEstimated,
+              estimatedInputCost: estimate.estimatedInputCost,
+              estimatedOutputCost: estimate.estimatedOutputCost,
+              estimatedTotalCost: estimate.estimatedTotalCost
+            },
+            null,
+            2
+          )
+        );
+        process.exit(0);
+      }
+
       console.log(`Tokens: ${estimate.inputTokens}`);
       console.log(`Estimated cost: $${estimate.estimatedTotalCost.toFixed(6)}`);
       console.log(`Provider: ${providerLabel}`);
@@ -120,6 +148,23 @@ function main() {
     }
 
     const tokens = countTokens(text, parsedArgs.model);
+
+    if (parsedArgs.json) {
+      const info = getModelInfo(parsedArgs.model);
+      console.log(
+        JSON.stringify(
+          {
+            mode: "tokens",
+            provider: info.provider,
+            model: info.normalizedModel,
+            tokens
+          },
+          null,
+          2
+        )
+      );
+      process.exit(0);
+    }
 
     console.log(tokens);
   } catch (error) {
