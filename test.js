@@ -479,3 +479,63 @@ test("cli json mode supports --messages-file", () => {
     }
   }
 });
+
+test("cli supports --stdin for plain text", () => {
+  const output = execFileSync(
+    process.execPath,
+    ["./cli.js", "--stdin", "--model", "gpt-4o"],
+    {
+      cwd: __dirname,
+      encoding: "utf8",
+      input: "Summarize this deployment incident."
+    }
+  ).trim();
+
+  assert.match(output, /^\d+$/);
+});
+
+test("cli supports --stdin for JSON messages in --json mode", () => {
+  const output = execFileSync(
+    process.execPath,
+    ["./cli.js", "--stdin", "--json", "--model", "sonnet-4"],
+    {
+      cwd: __dirname,
+      encoding: "utf8",
+      input: JSON.stringify([
+        {
+          role: "system",
+          content: "You are a concise incident analyst."
+        },
+        {
+          role: "user",
+          content: "Summarize the top three risks from this outage."
+        }
+      ])
+    }
+  ).trim();
+  const result = JSON.parse(output);
+
+  assert.equal(result.mode, "tokens");
+  assert.equal(result.inputType, "messages");
+  assert.equal(result.provider, "claude");
+  assert.equal(typeof result.tokens, "number");
+});
+
+test("cli supports --stdin with --cost and --json", () => {
+  const output = execFileSync(
+    process.execPath,
+    ["./cli.js", "--stdin", "--json", "--cost", "--model", "gpt-4o", "--output-tokens", "150"],
+    {
+      cwd: __dirname,
+      encoding: "utf8",
+      input: "Explain Kubernetes in two sentences."
+    }
+  ).trim();
+  const result = JSON.parse(output);
+
+  assert.equal(result.mode, "cost");
+  assert.equal(result.inputType, "text");
+  assert.equal(result.provider, "openai");
+  assert.equal(result.outputTokensReserved, 150);
+  assert.equal(typeof result.estimatedTotalCost, "number");
+});

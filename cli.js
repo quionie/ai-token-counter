@@ -7,13 +7,14 @@ const { countTokens, countMessages, estimateCost, getModelInfo } = require("./in
 
 function printUsage() {
   console.log(
-    "Usage: ai-token-counter [text] --model <model> [--file <path> | --messages-file <path>] [--cost] [--output-tokens <n>] [--json]"
+    "Usage: ai-token-counter [text] --model <model> [--file <path> | --messages-file <path> | --stdin] [--cost] [--output-tokens <n>] [--json]"
   );
   console.log("");
   console.log("Examples:");
   console.log('  ai-token-counter "Summarize this PR" --model gpt-4o');
   console.log("  ai-token-counter --model sonnet-4 --file ./prompt.txt");
   console.log("  ai-token-counter --model sonnet-4 --messages-file ./messages.json");
+  console.log('  echo "Summarize this issue" | ai-token-counter --stdin --model gpt-4o');
   console.log(
     '  ai-token-counter --cost --model gpt-4o "Explain Kubernetes in 2 sentences"'
   );
@@ -26,6 +27,7 @@ function parseArgs(argv) {
     model: null,
     file: null,
     messagesFile: null,
+    stdin: false,
     help: false,
     cost: false,
     outputTokens: 0,
@@ -47,6 +49,11 @@ function parseArgs(argv) {
 
     if (arg === "--json") {
       args.json = true;
+      continue;
+    }
+
+    if (arg === "--stdin") {
+      args.stdin = true;
       continue;
     }
 
@@ -87,8 +94,52 @@ function parseArgs(argv) {
 }
 
 function loadInput(parsedArgs) {
+  const inputSourceCount = Number(Boolean(parsedArgs.file)) +
+    Number(Boolean(parsedArgs.messagesFile)) +
+    Number(Boolean(parsedArgs.stdin));
+
+  if (inputSourceCount > 1) {
+    throw new Error(
+      "Use only one explicit input source: --file, --messages-file, or --stdin."
+    );
+  }
+
   if (parsedArgs.file && parsedArgs.messagesFile) {
     throw new Error("Use either --file or --messages-file, not both.");
+  }
+
+  if (parsedArgs.stdin && parsedArgs.textParts.length > 0) {
+    throw new Error("Do not pass inline text when using --stdin.");
+  }
+
+  if (parsedArgs.stdin) {
+    const raw = fs.readFileSync(0, "utf8");
+    const trimmed = raw.trim();
+
+    if (!trimmed) {
+      return {
+        kind: "text",
+        value: ""
+      };
+    }
+
+    try {
+      const parsed = JSON.parse(trimmed);
+
+      if (Array.isArray(parsed)) {
+        return {
+          kind: "messages",
+          value: parsed
+        };
+      }
+    } catch (error) {
+      // Treat non-JSON stdin as plain text input.
+    }
+
+    return {
+      kind: "text",
+      value: raw
+    };
   }
 
   if (parsedArgs.messagesFile) {

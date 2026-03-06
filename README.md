@@ -193,6 +193,18 @@ Count chat-style messages from a JSON file:
 npx ai-token-counter --model sonnet-4 --messages-file ./messages.json
 ```
 
+Pipe plain text via stdin:
+
+```bash
+echo "Summarize this issue" | npx ai-token-counter --stdin --model gpt-4o
+```
+
+Pipe JSON message arrays via stdin:
+
+```bash
+cat messages.json | npx ai-token-counter --stdin --json --model sonnet-4
+```
+
 Show help:
 
 ```bash
