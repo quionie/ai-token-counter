@@ -1,5 +1,7 @@
 "use strict";
 
+const PRICING = require("./src/pricing");
+
 const CJK_PATTERN =
   /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/g;
 const WORD_PATTERN = /[A-Za-z]+(?:'[A-Za-z]+)*/g;
@@ -27,13 +29,22 @@ const MODEL_PROFILES = {
     matchers: ["claude", "anthropic", "haiku", "sonnet", "opus"]
   }
 };
+const PRICING_PROVIDER_MAP = {
+  openai: "openai",
+  claude: "anthropic",
+  gemini: "google"
+};
+
+function normalizeModelLike(model) {
+  return model.toLowerCase().replace(/[\s_/.:]+/g, "-");
+}
 
 function normalizeModel(model) {
   if (typeof model !== "string" || model.trim() === "") {
     throw new TypeError("model must be a non-empty string");
   }
 
-  return model.toLowerCase().replace(/[\s_/.:]+/g, "-");
+  return normalizeModelLike(model);
 }
 
 function resolveModelProfile(model) {
@@ -78,6 +89,46 @@ function getModelInfo(model) {
 function countMatches(text, pattern) {
   const matches = text.match(pattern);
   return matches ? matches.length : 0;
+}
+
+function resolvePricing(provider, normalizedModel) {
+  const pricingProvider = PRICING_PROVIDER_MAP[provider];
+  const providerPricing = PRICING[pricingProvider] || {};
+  const defaultPricing = providerPricing.default || { input: 0, output: 0 };
+
+  for (const [modelName, price] of Object.entries(providerPricing)) {
+    if (modelName === "default") {
+      continue;
+    }
+
+    if (normalizeModelLike(modelName) === normalizedModel) {
+      return price;
+    }
+  }
+
+  let bestMatch = null;
+
+  for (const [modelName, price] of Object.entries(providerPricing)) {
+    if (modelName === "default") {
+      continue;
+    }
+
+    const normalizedCandidate = normalizeModelLike(modelName);
+
+    if (
+      normalizedModel.includes(normalizedCandidate) ||
+      normalizedCandidate.includes(normalizedModel)
+    ) {
+      if (!bestMatch || normalizedCandidate.length > bestMatch.length) {
+        bestMatch = {
+          length: normalizedCandidate.length,
+          price
+        };
+      }
+    }
+  }
+
+  return bestMatch ? bestMatch.price : defaultPricing;
 }
 
 function countWordTokens(text) {
@@ -267,9 +318,58 @@ function fitsContextWindow(input, model, maxOutputTokens) {
   };
 }
 
+function estimateCost(input, model, options) {
+  const modelInfo = getModelInfo(model);
+  const resolvedOptions = options === undefined ? {} : options;
+
+  if (
+    resolvedOptions === null ||
+    typeof resolvedOptions !== "object" ||
+    Array.isArray(resolvedOptions)
+  ) {
+    throw new TypeError("options must be an object when provided");
+  }
+
+  const outputTokens =
+    resolvedOptions.outputTokens === undefined ? 0 : resolvedOptions.outputTokens;
+
+  if (!Number.isInteger(outputTokens) || outputTokens < 0) {
+    throw new TypeError("options.outputTokens must be a non-negative integer");
+  }
+
+  let inputTokens;
+
+  if (typeof input === "string") {
+    inputTokens = countTokens(input, model);
+  } else if (Array.isArray(input)) {
+    inputTokens = countMessages(input, model);
+  } else {
+    throw new TypeError("input must be a string or an array of messages");
+  }
+
+  const pricing = resolvePricing(modelInfo.provider, modelInfo.normalizedModel);
+  const estimatedInputCost = Number((inputTokens * pricing.input).toFixed(9));
+  const estimatedOutputCost = Number((outputTokens * pricing.output).toFixed(9));
+  const estimatedTotalCost = Number(
+    (estimatedInputCost + estimatedOutputCost).toFixed(9)
+  );
+
+  return {
+    provider: modelInfo.provider,
+    model: modelInfo.normalizedModel,
+    inputTokens,
+    outputTokensReserved: outputTokens,
+    totalTokensEstimated: inputTokens + outputTokens,
+    estimatedInputCost,
+    estimatedOutputCost,
+    estimatedTotalCost
+  };
+}
+
 module.exports = {
   countTokens,
   countMessages,
   getModelInfo,
-  fitsContextWindow
+  fitsContextWindow,
+  estimateCost
 };

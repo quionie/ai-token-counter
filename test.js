@@ -9,7 +9,8 @@ const {
   countTokens,
   countMessages,
   getModelInfo,
-  fitsContextWindow
+  fitsContextWindow,
+  estimateCost
 } = require("./index");
 
 test("returns 0 for empty text", () => {
@@ -202,6 +203,43 @@ test("fitsContextWindow validates its inputs", () => {
   );
 });
 
+test("estimateCost returns totals for text input", () => {
+  const result = estimateCost("Summarize this issue.", "gpt-4o", {
+    outputTokens: 500
+  });
+
+  assert.equal(result.provider, "openai");
+  assert.equal(result.model, "gpt-4o");
+  assert.ok(result.inputTokens >= 1);
+  assert.equal(result.outputTokensReserved, 500);
+  assert.equal(result.totalTokensEstimated, result.inputTokens + 500);
+  assert.ok(result.estimatedInputCost > 0);
+  assert.ok(result.estimatedOutputCost > 0);
+  assert.ok(result.estimatedTotalCost > result.estimatedInputCost);
+});
+
+test("estimateCost supports message arrays and fallback pricing", () => {
+  const result = estimateCost(
+    [{ role: "user", content: "Summarize this issue and key risks." }],
+    "claude-3-5-sonnet"
+  );
+
+  assert.equal(result.provider, "claude");
+  assert.equal(result.outputTokensReserved, 0);
+  assert.ok(result.estimatedInputCost > 0);
+});
+
+test("estimateCost validates options", () => {
+  assert.throws(
+    () => estimateCost("hello", "gpt-4o", { outputTokens: -1 }),
+    /options.outputTokens must be a non-negative integer/
+  );
+  assert.throws(
+    () => estimateCost({ text: "hello" }, "gpt-4o"),
+    /input must be a string or an array of messages/
+  );
+});
+
 test("cli counts direct text input", () => {
   const output = execFileSync(
     process.execPath,
@@ -240,4 +278,27 @@ test("cli counts file input", () => {
       fs.unlinkSync(fixturePath);
     }
   }
+});
+
+test("cli cost mode prints formatted cost output", () => {
+  const output = execFileSync(
+    process.execPath,
+    [
+      "./cli.js",
+      "--cost",
+      "--model",
+      "gpt-4o",
+      "--output-tokens",
+      "100",
+      "Explain Kubernetes in 2 sentences."
+    ],
+    {
+      cwd: __dirname,
+      encoding: "utf8"
+    }
+  ).trim();
+
+  assert.match(output, /Tokens:\s+\d+/);
+  assert.match(output, /Estimated cost:\s+\$/);
+  assert.match(output, /Provider:\s+OpenAI/);
 });

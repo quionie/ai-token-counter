@@ -87,7 +87,7 @@ When building with LLM APIs, it is common to need a quick estimate of prompt siz
 `ai-token-counter` gives you a simple way to do that with a single function call.
 
 It now supports both raw text estimation and chat-style message arrays.
-It also includes model metadata and context-window checks for prompt budget guardrails.
+It also includes model metadata, context-window checks, and approximate token cost estimation.
 
 ## Installation
 
@@ -169,6 +169,7 @@ The library exports:
 - `countMessages(messages, model)`
 - `getModelInfo(model)`
 - `fitsContextWindow(input, model, maxOutputTokens?)`
+- `estimateCost(input, model, options?)`
 
 ## CLI
 
@@ -190,6 +191,12 @@ Show help:
 
 ```bash
 npx ai-token-counter --help
+```
+
+Estimate cost directly from the CLI:
+
+```bash
+npx ai-token-counter --cost --model gpt-4o "Explain Kubernetes in 2 sentences"
 ```
 
 ## API
@@ -237,6 +244,57 @@ Returns an object with:
 - `availableInputTokens`
 - `contextWindow`
 - `provider`
+
+### `estimateCost(input, model, options?)`
+
+Estimates approximate input and output token cost for text or chat messages.
+
+- `input`: either a raw text string or a chat-style message array
+- `model`: model name string
+- `options.outputTokens`: optional reserved output tokens
+
+Returns:
+
+- `provider`
+- `model`
+- `inputTokens`
+- `outputTokensReserved`
+- `totalTokensEstimated`
+- `estimatedInputCost`
+- `estimatedOutputCost`
+- `estimatedTotalCost`
+
+## Cost Estimation
+
+```js
+const { estimateCost } = require("ai-token-counter");
+
+const result = estimateCost("Explain Kubernetes.", "gpt-4o", {
+  outputTokens: 500
+});
+
+console.log(result);
+```
+
+The library uses a lightweight pricing map and falls back to provider defaults when an exact model price is not found.
+
+## Playground
+
+A lightweight browser playground is available in this repository.
+
+Open it locally:
+
+```bash
+open playground/index.html
+```
+
+The playground lets you:
+
+- paste prompt text
+- select a model
+- view token estimates
+- view estimated cost
+- view context window usage
 
 ## Supported Models
 

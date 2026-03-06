@@ -1,7 +1,7 @@
 {
   "name": "ai-token-counter",
   "version": "1.0.4",
-  "description": "A tiny Node.js library for rough token estimation for OpenAI and Claude models.",
+  "description": "A tiny Node.js library for rough token and cost estimation across OpenAI, Claude, and Gemini models.",
   "main": "index.js",
   "types": "index.d.ts",
   "bin": {
@@ -15,6 +15,8 @@
     "cli.js",
     "index.d.ts",
     "index.js",
+    "src/pricing.js",
+    "playground",
     "example.js",
     "README.md",
     "LICENSE"

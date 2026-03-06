@@ -23,6 +23,21 @@ export interface ContextWindowResult {
   provider: "openai" | "gemini" | "claude";
 }
 
+export interface EstimateCostOptions {
+  outputTokens?: number;
+}
+
+export interface EstimateCostResult {
+  provider: "openai" | "gemini" | "claude";
+  model: string;
+  inputTokens: number;
+  outputTokensReserved: number;
+  totalTokensEstimated: number;
+  estimatedInputCost: number;
+  estimatedOutputCost: number;
+  estimatedTotalCost: number;
+}
+
 export declare function countTokens(text: string, model: string): number;
 
 export declare function countMessages(
@@ -37,3 +52,9 @@ export declare function fitsContextWindow(
   model: string,
   maxOutputTokens?: number
 ): ContextWindowResult;
+
+export declare function estimateCost(
+  input: string | CountMessage[],
+  model: string,
+  options?: EstimateCostOptions
+): EstimateCostResult;

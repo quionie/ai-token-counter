@@ -3,14 +3,19 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { countTokens } = require("./index");
+const { countTokens, estimateCost, getModelInfo } = require("./index");
 
 function printUsage() {
-  console.log("Usage: ai-token-counter [text] --model <model> [--file <path>]");
+  console.log(
+    "Usage: ai-token-counter [text] --model <model> [--file <path>] [--cost] [--output-tokens <n>]"
+  );
   console.log("");
   console.log("Examples:");
   console.log('  ai-token-counter "Summarize this PR" --model gpt-4o');
   console.log("  ai-token-counter --model sonnet-4 --file ./prompt.txt");
+  console.log(
+    '  ai-token-counter --cost --model gpt-4o "Explain Kubernetes in 2 sentences"'
+  );
 }
 
 function parseArgs(argv) {
@@ -18,7 +23,9 @@ function parseArgs(argv) {
     textParts: [],
     model: null,
     file: null,
-    help: false
+    help: false,
+    cost: false,
+    outputTokens: 0
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -26,6 +33,11 @@ function parseArgs(argv) {
 
     if (arg === "--help" || arg === "-h") {
       args.help = true;
+      continue;
+    }
+
+    if (arg === "--cost") {
+      args.cost = true;
       continue;
     }
 
@@ -38,6 +50,18 @@ function parseArgs(argv) {
     if (arg === "--file") {
       index += 1;
       args.file = argv[index] || null;
+      continue;
+    }
+
+    if (arg === "--output-tokens" || arg === "--outputTokens") {
+      index += 1;
+      const value = Number(argv[index]);
+
+      if (!Number.isInteger(value) || value < 0) {
+        throw new Error("--output-tokens must be a non-negative integer.");
+      }
+
+      args.outputTokens = value;
       continue;
     }
 
@@ -73,6 +97,26 @@ function main() {
 
     if (!text) {
       throw new Error("Provide text directly or use --file <path>.");
+    }
+
+    if (parsedArgs.cost) {
+      const estimate = estimateCost(text, parsedArgs.model, {
+        outputTokens: parsedArgs.outputTokens
+      });
+      const info = getModelInfo(parsedArgs.model);
+      const providerLabels = {
+        openai: "OpenAI",
+        claude: "Claude",
+        gemini: "Google Gemini"
+      };
+      const providerLabel =
+        providerLabels[info.provider] ||
+        info.provider.charAt(0).toUpperCase() + info.provider.slice(1);
+
+      console.log(`Tokens: ${estimate.inputTokens}`);
+      console.log(`Estimated cost: $${estimate.estimatedTotalCost.toFixed(6)}`);
+      console.log(`Provider: ${providerLabel}`);
+      process.exit(0);
     }
 
     const tokens = countTokens(text, parsedArgs.model);

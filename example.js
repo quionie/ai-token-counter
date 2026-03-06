@@ -4,7 +4,8 @@ const {
   countTokens,
   countMessages,
   getModelInfo,
-  fitsContextWindow
+  fitsContextWindow,
+  estimateCost
 } = require("./index");
 
 const sample = [
@@ -37,4 +38,8 @@ console.log("Model info (sonnet-4):", getModelInfo("sonnet-4"));
 console.log(
   "Fits context window (gpt-4o):",
   fitsContextWindow(sample, "gpt-4o", 2000)
+);
+console.log(
+  "Estimated cost (gpt-4o):",
+  estimateCost(sample, "gpt-4o", { outputTokens: 500 })
 );
