@@ -5,6 +5,18 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { countTokens, countMessages, estimateCost, getModelInfo } = require("./index");
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+
+function assertFileSize(filePath) {
+  const stats = fs.statSync(filePath);
+
+  if (stats.size > MAX_FILE_SIZE) {
+    throw new Error(
+      "File exceeds maximum size of 10 MB: " + path.basename(filePath)
+    );
+  }
+}
+
 function printUsage() {
   console.log(
     "Usage: ai-token-counter [text] --model <model> [--file <path> | --messages-file <path> | --stdin] [--cost] [--output-tokens <n>] [--json]"
@@ -34,8 +46,20 @@ function parseArgs(argv) {
     json: false
   };
 
+  let stopFlags = false;
+
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+
+    if (arg === "--" && !stopFlags) {
+      stopFlags = true;
+      continue;
+    }
+
+    if (stopFlags) {
+      args.textParts.push(arg);
+      continue;
+    }
 
     if (arg === "--help" || arg === "-h") {
       args.help = true;
@@ -104,16 +128,21 @@ function loadInput(parsedArgs) {
     );
   }
 
-  if (parsedArgs.file && parsedArgs.messagesFile) {
-    throw new Error("Use either --file or --messages-file, not both.");
-  }
-
   if (parsedArgs.stdin && parsedArgs.textParts.length > 0) {
     throw new Error("Do not pass inline text when using --stdin.");
   }
 
   if (parsedArgs.stdin) {
+    if (process.stdin.isTTY) {
+      console.error("Warning: --stdin expects piped input. Reading from terminal; press Ctrl+D when done.");
+    }
+
     const raw = fs.readFileSync(0, "utf8");
+
+    if (raw.length > MAX_FILE_SIZE) {
+      throw new Error("stdin input exceeds maximum size of 10 MB.");
+    }
+
     const trimmed = raw.trim();
 
     if (!trimmed) {
@@ -144,6 +173,12 @@ function loadInput(parsedArgs) {
 
   if (parsedArgs.messagesFile) {
     const filePath = path.resolve(process.cwd(), parsedArgs.messagesFile);
+
+    if (!fs.existsSync(filePath)) {
+      throw new Error("File not found: " + parsedArgs.messagesFile);
+    }
+
+    assertFileSize(filePath);
     const raw = fs.readFileSync(filePath, "utf8");
     let parsed;
 
@@ -165,6 +200,12 @@ function loadInput(parsedArgs) {
 
   if (parsedArgs.file) {
     const filePath = path.resolve(process.cwd(), parsedArgs.file);
+
+    if (!fs.existsSync(filePath)) {
+      throw new Error("File not found: " + parsedArgs.file);
+    }
+
+    assertFileSize(filePath);
     return {
       kind: "text",
       value: fs.readFileSync(filePath, "utf8")

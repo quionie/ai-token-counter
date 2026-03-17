@@ -178,6 +178,8 @@ function estimateBaseTokens(text) {
   };
 }
 
+const MAX_INPUT_LENGTH = 10 * 1024 * 1024; // 10 MB
+
 function countTokens(text, model) {
   if (typeof text !== "string") {
     throw new TypeError("text must be a string");
@@ -185,6 +187,12 @@ function countTokens(text, model) {
 
   if (text.length === 0) {
     return 0;
+  }
+
+  if (text.length > MAX_INPUT_LENGTH) {
+    throw new RangeError(
+      "input exceeds maximum length of " + MAX_INPUT_LENGTH + " characters"
+    );
   }
 
   const provider = detectProvider(model);
@@ -257,8 +265,11 @@ function countMessages(messages, model) {
       throw new TypeError("each message must be an object");
     }
 
-    const role = typeof message.role === "string" ? message.role : "";
-    const content = message.content;
+    const role = Object.prototype.hasOwnProperty.call(message, "role") &&
+      typeof message.role === "string" ? message.role : "";
+    const content = Object.prototype.hasOwnProperty.call(message, "content")
+      ? message.content
+      : undefined;
 
     if (typeof content !== "string") {
       throw new TypeError("each message content must be a string");
@@ -273,7 +284,8 @@ function countMessages(messages, model) {
       total += Math.max(1, Math.ceil(role.length / 8));
     }
 
-    if (message.name && typeof message.name === "string") {
+    if (Object.prototype.hasOwnProperty.call(message, "name") &&
+      typeof message.name === "string") {
       total += Math.max(1, Math.ceil(message.name.length / 8));
     }
   }
@@ -348,11 +360,13 @@ function estimateCost(input, model, options) {
   }
 
   const pricing = resolvePricing(modelInfo.provider, modelInfo.normalizedModel);
-  const estimatedInputCost = Number((inputTokens * pricing.input).toFixed(9));
-  const estimatedOutputCost = Number((outputTokens * pricing.output).toFixed(9));
-  const estimatedTotalCost = Number(
-    (estimatedInputCost + estimatedOutputCost).toFixed(9)
-  );
+  const PRECISION = 1e9;
+  const estimatedInputCost =
+    Math.round(inputTokens * pricing.input * PRECISION) / PRECISION;
+  const estimatedOutputCost =
+    Math.round(outputTokens * pricing.output * PRECISION) / PRECISION;
+  const estimatedTotalCost =
+    Math.round((estimatedInputCost + estimatedOutputCost) * PRECISION) / PRECISION;
 
   return {
     provider: modelInfo.provider,
